@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""ci-mirror: see and run what CI runs.
+
+    ci-mirror [list] [--json]                 jobs from GitHub Actions / GitLab CI / pre-commit, plus task runners
+    ci-mirror run JOB [--dry-run] [--keep-going] [--include-risky]
+
+JOB is a job name (`test`) or a full ref (`github/ci.yml:test`). Steps that use actions, ${{ }}
+expressions, or look like deploys are skipped and reported.
+"""
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
+import hookio  # noqa: E402
+from ci_mirror.core import DEFAULTS, PLUGIN, all_jobs, find_job, plan, run_job, task_runners  # noqa: E402
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(prog="ci-mirror", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("action", nargs="?", default="list", choices=["list", "run"])
+    ap.add_argument("job", nargs="?")
+    ap.add_argument("--project", default=os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--keep-going", action="store_true")
+    ap.add_argument("--include-risky", action="store_true")
+    a = ap.parse_args()
+    project = Path(a.project).resolve()
+    cfg = hookio.load_config(PLUGIN, project, DEFAULTS)
+    jobs = all_jobs(project)
+    if a.action == "list":
+        if a.json:
+            print(json.dumps({"jobs": [{"ref": j.ref, "steps": [s.to_dict() for s in j.steps]} for j in jobs],
+                              "task_runners": task_runners(project)}, indent=2))
+            return 0
+        if not jobs:
+            print("no CI jobs found (.github/workflows, .gitlab-ci.yml, .pre-commit-config.yaml)")
+        for j in jobs:
+            print(f"\n{j.ref}")
+            for st, skip in plan(j, cfg, include_risky=False):
+                body = (st.run or "").strip().replace("\n", "\n      ")
+                print(f"  - {st.name}" + (f"  [skipped locally: {skip}]" if skip else f"\n      {body}"))
+        for name, items in task_runners(project).items():
+            print(f"\n{name}: {', '.join(items)}")
+        return 0
+    if not a.job:
+        ap.error("run needs a JOB")
+    matches = find_job(jobs, a.job)
+    if len(matches) != 1:
+        print(f"ci-mirror: {'no job' if not matches else 'several jobs'} match '{a.job}': "
+              + ", ".join(j.ref for j in (matches or jobs)))
+        return 2
+    return run_job(project, matches[0], cfg, a.include_risky, a.dry_run, a.keep_going)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

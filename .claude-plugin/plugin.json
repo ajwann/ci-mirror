@@ -1,0 +1,19 @@
+{
+  "name": "ci-mirror",
+  "version": "0.1.0",
+  "description": "Reads the project's CI config (GitHub Actions, GitLab CI, pre-commit) and task runners, tells Claude what CI will run, and runs the same steps locally.",
+  "author": {
+    "name": "Adam Wanninger",
+    "email": "adam@awanninger.com"
+  },
+  "homepage": "https://github.com/ajwann/ci-mirror",
+  "repository": "https://github.com/ajwann/ci-mirror",
+  "license": "MIT",
+  "keywords": [
+    "ci",
+    "github-actions",
+    "gitlab",
+    "make",
+    "hooks"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "description": "ci-mirror: tell Claude what CI runs",
+  "hooks": {
+    "SessionStart": [
+      {"hooks": [{"type": "command", "command": "python3", "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/hook.py"], "timeout": 15}]}
+    ]
+  }
+}
